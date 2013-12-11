@@ -1,4 +1,4 @@
-Computer Vision Project
+Image Segmentation Techniques
 =========
 
 1. Goals – build and test Matlab implementations of:
@@ -8,11 +8,8 @@ Computer Vision Project
 
 2. Sources
     - Szeliski
-    - Available Matlab implementation/sources
-        * Matlab activecontour(.) function
-        * UTexas HW #1 and other WWW sources for E-M method
-        * Matlab implementations of Mean Shift
-    - Any source you find
+    - Expectation Maximization
+        * http://courses.cs.washington.edu/courses/cse576/12sp/notes/remote.pdf
 
 3. Report
     - Give mathematical and algorithmic theory for each method
