@@ -1,0 +1,35 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- This HTML was auto-generated from MATLAB code. To make changes, update the MATLAB code and republish this document.       --><title>テープのロールの半径の測定</title><meta name="generator" content="MATLAB 7.14"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2011-11-15"><meta name="DC.source" content="ipexradius.m"><link rel="stylesheet" type="text/css" href="../../../../matlab/helptools/private/style.css"><link rel="stylesheet" type="text/css" href="../../../../matlab/helptools/private/style_ja_JP.css"></head><body><div class="header"><div class="left"><a href="matlab:edit ipexradius">エディターで ipexradius.m を開く</a></div><div class="right"><a href="matlab:echodemo ipexradius">コマンド ウィンドウで実行</a></div></div><div class="content"><h1>テープのロールの半径の測定</h1><!--introduction--><p>この例では、テープ ディスペンサーによって部分的に不明瞭になっているテープのロールの半径を測定する方法を示します。このタスクには、<tt>imfindcircles</tt> を使用します。</p><!--/introduction--><h2>目次</h2><div><ul><li><a href="#1">手順 1:イメージの読み取り</a></li><li><a href="#2">手順 2:円の検出</a></li><li><a href="#3">手順 3:円の外枠および中心の強調表示</a></li></ul></div><h2>手順 1:イメージの読み取り<a name="1"></a></h2><p><tt>tape.png</tt> を読み取ります。</p><pre class="codeinput">RGB = imread(<span class="string">'tape.png'</span>);
+imshow(RGB);
+
+hTxt = text(15,15,<span class="string">'Estimate radius of the roll of tape'</span>,<span class="keyword">...</span>
+     <span class="string">'FontWeight'</span>,<span class="string">'bold'</span>,<span class="string">'Color'</span>,<span class="string">'y'</span>);
+</pre><img vspace="5" hspace="5" src="../ipexradius_01.png" alt=""> <h2>手順 2:円の検出<a name="2"></a></h2><p><tt>imfindcircles</tt> を使用して、イメージ内の円の中心と半径を検出します。</p><pre class="codeinput">Rmin = 60;
+Rmax = 100;
+[center, radius] = imfindcircles(RGB,[Rmin Rmax],<span class="string">'Sensitivity'</span>,0.9)
+</pre><pre class="codeoutput">
+center =
+
+  236.9291  172.4747
+
+
+radius =
+
+   79.5305
+
+</pre><h2>手順 3:円の外枠および中心の強調表示<a name="3"></a></h2><pre class="codeinput"><span class="comment">% Display the circle</span>
+viscircles(center,radius);
+
+<span class="comment">% Display the calculated center</span>
+hold <span class="string">on</span>;
+plot(center(:,1),center(:,2),<span class="string">'yx'</span>,<span class="string">'LineWidth'</span>,2);
+hold <span class="string">off</span>;
+
+delete(hTxt);
+message = sprintf(<span class="string">'The estimated radius is %2.1f pixels'</span>, radius);
+text(15,15,message,<span class="string">'Color'</span>,<span class="string">'y'</span>,<span class="string">'FontWeight'</span>,<span class="string">'bold'</span>);
+</pre><img vspace="5" hspace="5" src="../ipexradius_02.png" alt=""> <p class="footer">Copyright 1993-2006 The MathWorks, Inc.<br>Published with MATLAB&reg; 7.13</p><p class="footer" id="trademarks">MATLAB and Simulink are registered trademarks of The MathWorks, Inc.  Please see <a href="http://www.mathworks.com/trademarks">www.mathworks.com/trademarks</a> for a list of other trademarks owned by The MathWorks, Inc.  Other product or brand names are trademarks or registered trademarks of their respective owners.</p></div><!-- ##### SOURCE BEGIN ##### %% Measuring the Radius of a Roll of Tape % This example shows how to measure the radius of a roll of tape, which is % partially obscured by the tape dispenser. Utilize |imfindcircles| to % accomplish this task. % % Copyright 2003-2011 The MathWorks, Inc.  % $Revision: 1.1.8.5 $ $Date: 2012/02/14 03:31:32 $  %% Step 1: Read Image % Read in |tape.png|.  RGB = imread('tape.png'); imshow(RGB);  hTxt = text(15,15,'Estimate radius of the roll of tape',...      'FontWeight','bold','Color','y');  %% Step 2: Find the Circle % Find the center and the radius of the circle in the image using % |imfindcircles|.  Rmin = 60;  Rmax = 100; [center, radius] = imfindcircles(RGB,[Rmin Rmax],'Sensitivity',0.9)  %% Step 3: Highlight the Circle Outline and Center  % Display the circle viscircles(center,radius);  % Display the calculated center hold on; plot(center(:,1),center(:,2),'yx','LineWidth',2); hold off;  delete(hTxt); message = sprintf('The estimated radius is %2.1f pixels', radius); text(15,15,message,'Color','y','FontWeight','bold');  displayEndOfDemoMessage(mfilename)  ##### SOURCE END ##### --></body></html>

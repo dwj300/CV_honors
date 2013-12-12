@@ -1,0 +1,228 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Find Image Rotation and Scale Using Automated Feature Matching</title><meta name="generator" content="MATLAB 8.1"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2013-01-17"><meta name="DC.source" content="ipexautorotate.m"><link rel="stylesheet" type="text/css" href="../../../matlab/helptools/private/style.css"></head><body><div class="header"><div class="left"><a href="matlab:edit ipexautorotate">Open ipexautorotate.m in the Editor</a></div><div class="right"><a href="matlab:echodemo ipexautorotate">Run in the Command Window</a></div></div><div class="content"><h1>Find Image Rotation and Scale Using Automated Feature Matching</h1><!--introduction--><p>This example shows how to automatically align two images that differ by a rotation and a scale change. It closely parallels another example titled <a href="matlab:showdemo('ipexrotate')">Find Image Rotation and Scale</a>. Instead of using a manual approach to register the two images, it utilizes feature-based techniques found in the Computer Vision System Toolbox&#8482; to automate the registration process.</p><p>In this example, you will use <tt>detectSURFFeatures</tt> and <tt>vision.GeometricTransformEstimator</tt> System object to recover rotation angle and scale factor of a distorted image. You will then transform the distorted image to recover the original image.</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Step 1: Read Image</a></li><li><a href="#2">Step 2: Resize and Rotate the Image</a></li><li><a href="#4">Step 3: Find Matching Features Between Images</a></li><li><a href="#9">Step 4: Estimate Transformation</a></li><li><a href="#11">Step 5: Solve for Scale and Angle</a></li><li><a href="#14">Step 6: Recover the Original Image</a></li></ul></div><h2>Step 1: Read Image<a name="1"></a></h2><p>Bring an image into the workspace.</p><pre class="codeinput">original = imread(<span class="string">'cameraman.tif'</span>);
+imshow(original);
+text(size(original,2),size(original,1)+15, <span class="keyword">...</span>
+    <span class="string">'Image courtesy of Massachusetts Institute of Technology'</span>, <span class="keyword">...</span>
+    <span class="string">'FontSize'</span>,7,<span class="string">'HorizontalAlignment'</span>,<span class="string">'right'</span>);
+</pre><img vspace="5" hspace="5" src="ipexautorotate_01.png" alt=""> <h2>Step 2: Resize and Rotate the Image<a name="2"></a></h2><pre class="codeinput">scale = 0.7;
+J = imresize(original, scale); <span class="comment">% Try varying the scale factor.</span>
+
+theta = 30;
+distorted = imrotate(J,theta); <span class="comment">% Try varying the angle, theta.</span>
+figure, imshow(distorted)
+</pre><img vspace="5" hspace="5" src="ipexautorotate_02.png" alt=""> <p>You can experiment by varying the scale and rotation of the input image. However, note that there is a limit to the amount you can vary the scale before the feature detector fails to find enough features.</p><h2>Step 3: Find Matching Features Between Images<a name="4"></a></h2><p>Detect features in both images.</p><pre class="codeinput">ptsOriginal  = detectSURFFeatures(original);
+ptsDistorted = detectSURFFeatures(distorted);
+</pre><p>Extract feature descriptors.</p><pre class="codeinput">[featuresIn   validPtsIn]  = extractFeatures(original,  ptsOriginal);
+[featuresOut validPtsOut]  = extractFeatures(distorted, ptsDistorted);
+</pre><p>Match features by using their descriptors.</p><pre class="codeinput">index_pairs = matchFeatures(featuresIn, featuresOut);
+</pre><p>Retrieve locations of corresponding points for each image.</p><pre class="codeinput">matchedOriginal  = validPtsIn(index_pairs(:,1));
+matchedDistorted = validPtsOut(index_pairs(:,2));
+</pre><p>Show point matches. Notice the presence of outliers.</p><pre class="codeinput">figure;
+showMatchedFeatures(original,distorted,matchedOriginal,matchedDistorted);
+title(<span class="string">'Putatively matched points (including outliers)'</span>);
+</pre><img vspace="5" hspace="5" src="ipexautorotate_03.png" alt=""> <h2>Step 4: Estimate Transformation<a name="9"></a></h2><p>Find a transformation matrix corresponding to the matching point pairs using the statistically robust RANdom SAmpling Consensus (RANSAC) algorithm. Remove outliers while computing the transformation matrix.</p><p>Note the use of System object from the Computer Vision System Toolbox. To use a System object, you will first construct it, configure it, and then invoke a step() method to execute the main algorithm.</p><pre class="codeinput">geoTransformEst = vision.GeometricTransformEstimator; <span class="comment">% defaults to RANSAC</span>
+
+<span class="comment">% Configure the System object.</span>
+geoTransformEst.Transform = <span class="string">'Nonreflective similarity'</span>;
+geoTransformEst.NumRandomSamplingsMethod = <span class="string">'Desired confidence'</span>;
+geoTransformEst.MaximumRandomSamples = 1000;
+geoTransformEst.DesiredConfidence = 99.8;
+
+<span class="comment">% Invoke the step() method on the geoTransformEst object to compute the</span>
+<span class="comment">% transformation from the distorted to the original image. You</span>
+<span class="comment">% may see varying results of the transformation matrix computation because</span>
+<span class="comment">% of the random sampling employed by the RANSAC algorithm.</span>
+[tform_matrix inlierIdx] = step(geoTransformEst, matchedDistorted.Location, <span class="keyword">...</span>
+    matchedOriginal.Location);
+</pre><p>Display matching point pairs used in the computation of the transformation matrix.</p><pre class="codeinput">figure;
+showMatchedFeatures(original,distorted,matchedOriginal(inlierIdx),<span class="keyword">...</span>
+    matchedDistorted(inlierIdx));
+title(<span class="string">'Matching points (inliers only)'</span>);
+legend(<span class="string">'ptsOriginal'</span>,<span class="string">'ptsDistorted'</span>);
+</pre><img vspace="5" hspace="5" src="ipexautorotate_04.png" alt=""> <h2>Step 5: Solve for Scale and Angle<a name="11"></a></h2><p>Use the geometric transformation matrix, TFORM_MATRIX, to recover the scale and angle. Since we computed the transformation from the distorted to the original image, we need to compute its inverse to recover the distortion.</p><pre>Let sc = s*cos(theta)
+Let ss = s*sin(theta)</pre><pre>Then, Tinv = [sc -ss  0;
+              ss  sc  0;
+              tx  ty  1]</pre><pre>where tx and ty are x and y translations, respectively.</pre><p>The matrix obtained in the previous step describes a nonreflective similarity transformation in a compact 3-by-2 matrix, without the implied [0 0 1]' last column. The inverse operation requires this column.</p><pre class="codeinput">tform_matrix = cat(2,tform_matrix,[0 0 1]'); <span class="comment">% pad the matrix</span>
+Tinv  = inv(tform_matrix);
+
+ss = Tinv(2,1);
+sc = Tinv(1,1);
+scale_recovered = sqrt(ss*ss + sc*sc)
+theta_recovered = atan2(ss,sc)*180/pi
+</pre><pre class="codeoutput">
+scale_recovered =
+
+    0.7028
+
+
+theta_recovered =
+
+   30.3537
+
+</pre><p>The recovered values should match your scale and angle values selected in <b>Step 2: Resize and Rotate the Image</b>.</p><h2>Step 6: Recover the Original Image<a name="14"></a></h2><p>Recover the original image by transforming the distorted image.</p><pre class="codeinput">t = maketform(<span class="string">'affine'</span>, double(tform_matrix));
+D = size(original);
+recovered = imtransform(distorted,t,<span class="string">'XData'</span>,[1 D(2)],<span class="string">'YData'</span>,[1 D(1)]);
+</pre><p>Compare <tt>recovered</tt> to <tt>original</tt> by looking at them side-by-side in a montage.</p><pre class="codeinput">figure, imshowpair(original,recovered,<span class="string">'montage'</span>)
+</pre><img vspace="5" hspace="5" src="ipexautorotate_05.png" alt=""> <p>The <tt>recovered</tt> (right) image quality does not match the <tt>original</tt> (left) image because of the distortion and recovery process. In particular, the image shrinking causes loss of information. The artifacts around the edges are due to the limited accuracy of the transformation. If you were to detect more points in <b>Step 4: Find Matching Features Between Images</b>, the transformation would be more accurate. For example, we could have used a corner detector, <tt>vision.CornerDetector</tt>, to complement the SURF feature detector which finds blobs. Image content and image size also impact the number of detected features.</p><p class="footer">Copyright 1993-2012 The MathWorks, Inc.<br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2013a</a><br><br>
+		  MATLAB and Simulink are registered trademarks of The MathWorks, Inc.  Please see <a href="http://www.mathworks.com/trademarks">www.mathworks.com/trademarks</a> for a list of other trademarks owned by The MathWorks, Inc.  Other product or brand names are trademarks or registered trademarks of their respective owners.
+      </p></div><!--
+##### SOURCE BEGIN #####
+%% Find Image Rotation and Scale Using Automated Feature Matching
+% This example shows how to automatically align two images that differ by a
+% rotation and a scale change. It closely parallels another example titled
+% <matlab:showdemo('ipexrotate') Find Image Rotation and Scale>. 
+% Instead of using a manual approach to register the two images, it
+% utilizes feature-based techniques found in the Computer Vision System
+% Toolbox(TM) to automate the registration process.
+%
+% In this example, you will use |detectSURFFeatures| and 
+% |vision.GeometricTransformEstimator| System object to recover rotation 
+% angle and scale factor of a distorted image. You will then transform the 
+% distorted image to recover the original image.
+
+% Copyright 1993-2012 The MathWorks, Inc. 
+% $Revision: 1.1.6.4 $ $Date: 2012/04/25 07:11:25 $
+
+%% Step 1: Read Image
+% Bring an image into the workspace.
+original = imread('cameraman.tif');
+imshow(original);
+text(size(original,2),size(original,1)+15, ...
+    'Image courtesy of Massachusetts Institute of Technology', ...
+    'FontSize',7,'HorizontalAlignment','right');
+
+%% Step 2: Resize and Rotate the Image
+
+scale = 0.7;
+J = imresize(original, scale); % Try varying the scale factor.
+
+theta = 30;
+distorted = imrotate(J,theta); % Try varying the angle, theta.
+figure, imshow(distorted)
+
+%%
+% You can experiment by varying the scale and rotation of the input image.
+% However, note that there is a limit to the amount you can vary the scale
+% before the feature detector fails to find enough features.
+
+%% Step 3: Find Matching Features Between Images
+% Detect features in both images.
+ptsOriginal  = detectSURFFeatures(original);
+ptsDistorted = detectSURFFeatures(distorted);
+
+%%
+% Extract feature descriptors.
+[featuresIn   validPtsIn]  = extractFeatures(original,  ptsOriginal);
+[featuresOut validPtsOut]  = extractFeatures(distorted, ptsDistorted);
+
+%%
+% Match features by using their descriptors.
+index_pairs = matchFeatures(featuresIn, featuresOut);
+
+%%
+% Retrieve locations of corresponding points for each image.
+matchedOriginal  = validPtsIn(index_pairs(:,1));
+matchedDistorted = validPtsOut(index_pairs(:,2));
+
+%%
+% Show point matches. Notice the presence of outliers.
+figure;
+showMatchedFeatures(original,distorted,matchedOriginal,matchedDistorted);
+title('Putatively matched points (including outliers)');
+
+%% Step 4: Estimate Transformation
+% Find a transformation matrix corresponding to the matching point pairs 
+% using the statistically robust RANdom SAmpling Consensus (RANSAC) 
+% algorithm. Remove outliers while computing the transformation matrix.
+%
+% Note the use of System object from the Computer Vision System Toolbox.
+% To use a System object, you will first construct it, configure it,
+% and then invoke a step() method to execute the main algorithm.
+geoTransformEst = vision.GeometricTransformEstimator; % defaults to RANSAC
+
+% Configure the System object.
+geoTransformEst.Transform = 'Nonreflective similarity';
+geoTransformEst.NumRandomSamplingsMethod = 'Desired confidence';
+geoTransformEst.MaximumRandomSamples = 1000;
+geoTransformEst.DesiredConfidence = 99.8;
+
+% Invoke the step() method on the geoTransformEst object to compute the 
+% transformation from the distorted to the original image. You 
+% may see varying results of the transformation matrix computation because 
+% of the random sampling employed by the RANSAC algorithm.
+[tform_matrix inlierIdx] = step(geoTransformEst, matchedDistorted.Location, ...
+    matchedOriginal.Location);
+
+%%
+% Display matching point pairs used in the computation of the
+% transformation matrix.
+figure;
+showMatchedFeatures(original,distorted,matchedOriginal(inlierIdx),...
+    matchedDistorted(inlierIdx));
+title('Matching points (inliers only)');
+legend('ptsOriginal','ptsDistorted');
+
+%% Step 5: Solve for Scale and Angle
+% Use the geometric transformation matrix, TFORM_MATRIX, to recover 
+% the scale and angle. Since we computed the transformation from the
+% distorted to the original image, we need to compute its inverse to 
+% recover the distortion.
+%
+%  Let sc = s*cos(theta)
+%  Let ss = s*sin(theta)
+%
+%  Then, Tinv = [sc -ss  0;
+%                ss  sc  0;
+%                tx  ty  1]
+%
+%  where tx and ty are x and y translations, respectively.
+%
+
+%%
+% The matrix obtained in the previous step describes a nonreflective 
+% similarity transformation in a compact 3-by-2 matrix, without the implied 
+% [0 0 1]' last column. The inverse operation requires this column.
+tform_matrix = cat(2,tform_matrix,[0 0 1]'); % pad the matrix
+Tinv  = inv(tform_matrix);
+
+ss = Tinv(2,1);
+sc = Tinv(1,1);
+scale_recovered = sqrt(ss*ss + sc*sc)
+theta_recovered = atan2(ss,sc)*180/pi
+
+%%
+% The recovered values should match your scale and angle values selected in
+% *Step 2: Resize and Rotate the Image*.
+
+%% Step 6: Recover the Original Image
+% Recover the original image by transforming the distorted image.
+t = maketform('affine', double(tform_matrix));
+D = size(original);
+recovered = imtransform(distorted,t,'XData',[1 D(2)],'YData',[1 D(1)]);
+
+%%
+% Compare |recovered| to |original| by looking at them side-by-side in a montage.
+figure, imshowpair(original,recovered,'montage')
+
+%%
+% The |recovered| (right) image quality does not match the |original| (left)
+% image because of the distortion and recovery process. In particular, the 
+% image shrinking causes loss of information. The artifacts around the edges are 
+% due to the limited accuracy of the transformation. If you were to detect 
+% more points in *Step 4: Find Matching Features Between Images*, 
+% the transformation would be more accurate. For example, we could have
+% used a corner detector, |vision.CornerDetector|, to complement the SURF 
+% feature detector which finds blobs. Image content and image size also 
+% impact the number of detected features.
+
+displayEndOfDemoMessage(mfilename)
+
+##### SOURCE END #####
+--></body></html>

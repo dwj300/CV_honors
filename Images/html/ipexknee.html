@@ -1,0 +1,360 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Registering Multimodal MRI Images</title><meta name="generator" content="MATLAB 8.1"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2013-01-17"><meta name="DC.source" content="ipexknee.m"><link rel="stylesheet" type="text/css" href="../../../matlab/helptools/private/style.css"></head><body><div class="header"><div class="left"><a href="matlab:edit ipexknee">Open ipexknee.m in the Editor</a></div><div class="right"><a href="matlab:echodemo ipexknee">Run in the Command Window</a></div></div><div class="content"><h1>Registering Multimodal MRI Images</h1><!--introduction--><p>This example shows how you can use <tt>imregister</tt> to automatically align two magnetic resonance images (MRI) to a common coordinate system using intensity-based image registration.  Unlike some other techniques, it does not find features or use control points. Intensity-based registration is often well-suited for medical and remotely sensed imagery.</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Step 1: Load Images</a></li><li><a href="#4">Step 2: Set up the Initial Registration</a></li><li><a href="#6">Step 3: Improve the Registration</a></li><li><a href="#9">Step 4: Improve the Speed of Registration</a></li><li><a href="#13">Step 5: Further Refinement</a></li><li><a href="#14">Step 6: Deciding When Enough is Enough</a></li><li><a href="#15">Step 7: Alternate Visualizations</a></li></ul></div><h2>Step 1: Load Images<a name="1"></a></h2><p>This example uses two magnetic resonance (MRI) images of a knee. The fixed image is a spin echo image, while the moving image is a spin echo image with inversion recovery.  The two sagittal slices were acquired at the same time but are slightly out of alignment.</p><pre class="codeinput">fixed = dicomread(<span class="string">'knee1.dcm'</span>);
+moving = dicomread(<span class="string">'knee2.dcm'</span>);
+</pre><p>The <tt>imshowpair</tt> function is a useful function for visualizing images during every part of the registration process.  Use it to see the two images individually in a montage fashion or display them stacked to show the amount of misregistration.</p><pre class="codeinput">figure, imshowpair(moving, fixed, <span class="string">'montage'</span>)
+title(<span class="string">'Unregistered'</span>)
+</pre><img vspace="5" hspace="5" src="ipexknee_01.png" alt=""> <p>In the overlapping image from <tt>imshowpair</tt>, gray areas correspond to areas that have similar intensities, while magenta and green areas show places where one image is brighter than the other.  In some imager pairs, green and magenta areas don't always indicate misregistration, but in this example it's easy to use the color information to see where they do.</p><pre class="codeinput">figure, imshowpair(moving, fixed)
+title(<span class="string">'Unregistered'</span>)
+</pre><img vspace="5" hspace="5" src="ipexknee_02.png" alt=""> <h2>Step 2: Set up the Initial Registration<a name="4"></a></h2><p>The <tt>imregconfig</tt> function makes it easy to pick the correct optimizer and metric configuration to use with <tt>imregister</tt>. These two images have different intensity distributions, which suggests a multimodal configuration.</p><pre class="codeinput">[optimizer,metric] = imregconfig(<span class="string">'multimodal'</span>);
+</pre><p>The distortion between the two images includes scaling, rotation, and (possibly) shear.  Use an affine transformation to register the images.</p><p>It's very, very rare that <tt>imregister</tt> will align images perfectly with the default settings.  Nevertheless, using them is a useful way to decide which properties to tune first.</p><pre class="codeinput">tic
+movingRegisteredDefault = imregister(moving, fixed, <span class="string">'affine'</span>, optimizer, metric);
+timeDefault = toc
+
+figure, imshowpair(movingRegisteredDefault, fixed)
+title(<span class="string">'A: Default registration'</span>)
+</pre><pre class="codeoutput">
+timeDefault =
+
+    3.8787
+
+</pre><img vspace="5" hspace="5" src="ipexknee_03.png" alt=""> <h2>Step 3: Improve the Registration<a name="6"></a></h2><p>The initial registration was pretty good, but there are still some areas that don't line up.  It's easiest to see this along the left and right edges of the image and in the small bright bands that run through the right-hand part.  Try to improve the registration by adjusting the optimizer and metric configuration properties.</p><p>The optimizer and metric variables are objects whose properties control the registration.</p><pre class="codeinput">optimizer
+metric
+</pre><pre class="codeoutput">
+optimizer = 
+
+  registration.optimizer.OnePlusOneEvolutionary
+
+  Properties:
+         GrowthFactor: 1.050000e+00
+              Epsilon: 1.500000e-06
+        InitialRadius: 6.250000e-03
+    MaximumIterations: 100
+
+metric = 
+
+  registration.metric.MattesMutualInformation
+
+  Properties:
+    NumberOfSpatialSamples: 500
+     NumberOfHistogramBins: 50
+              UseAllPixels: 1
+</pre><p>Because the registration improved with the default parameters, perhaps it will continue to improve if the optimization runs longer.</p><pre class="codeinput">optimizer.MaximumIterations = 300;
+
+movingRegistered = imregister(moving, fixed, <span class="string">'affine'</span>, optimizer, metric);
+figure, imshowpair(movingRegistered, fixed)
+title(<span class="string">'MaximumIterations = 300'</span>)
+</pre><img vspace="5" hspace="5" src="ipexknee_04.png" alt=""> <p>Does it continue to improve if run even longer?</p><pre class="codeinput">optimizer.MaximumIterations = 500;
+
+tic
+movingRegistered500 = imregister(moving, fixed, <span class="string">'affine'</span>, optimizer, metric);
+time500 = toc
+
+figure, imshowpair(movingRegistered500, fixed)
+title(<span class="string">'B: MaximumIterations = 500'</span>)
+</pre><pre class="codeoutput">
+time500 =
+
+   18.5179
+
+</pre><img vspace="5" hspace="5" src="ipexknee_05.png" alt=""> <h2>Step 4: Improve the Speed of Registration<a name="9"></a></h2><p>The previous section showed that it's often possible to improve a registration with the default parameters simply by letting it run longer.  Although increasing 'MaximumIterations' will likely lead to convergence, it's also likely that running for a longer time will yield diminishing returns.</p><p>It's often possible to force the optimizer to be more aggressive in its initial steps.  Changing parameters that control step size might move the registration closer to the correct solution more quickly, but it could result in treating a local extrema as the best answer, when the best answer is elsewhere in the optimization space.</p><p>The 'InitialRadius' property controls the initial search radius for the optimizer.</p><pre class="codeinput">optimizer.MaximumIterations = 100;
+optimizer.InitialRadius = 0.009;
+
+movingRegistered = imregister(moving, fixed, <span class="string">'affine'</span>, optimizer, metric);
+figure, imshowpair(movingRegistered, fixed)
+title(<span class="string">'MaximumIterations = 100, InitialRadius = 0.009'</span>)
+</pre><img vspace="5" hspace="5" src="ipexknee_06.png" alt=""> <p>Compared with the default configuration, the results are worse. While 'InitialRadius specifies the upper bound of the search radius, 'Epsilon' sets the lower bound.</p><pre class="codeinput">[optimizer,metric] = imregconfig(<span class="string">'multimodal'</span>);
+optimizer.Epsilon = 1.5e-4;
+
+movingRegistered = imregister(moving, fixed, <span class="string">'affine'</span>, optimizer, metric);
+figure, imshowpair(movingRegistered, fixed)
+title(<span class="string">'MaximumIterations = 100, Epsilon = 1.5e-4'</span>)
+</pre><img vspace="5" hspace="5" src="ipexknee_07.png" alt=""> <p>This configuration yields almost exactly the same registration as the default parameters with almost no difference in performance.</p><p>The only remaining optimizer property to tweak independently is 'GrowthFactor', which controls the rate at which the search radius grows in parameter space.  A larger growth factor causes a more aggressive optimization.</p><pre class="codeinput">[optimizer,metric] = imregconfig(<span class="string">'multimodal'</span>);
+optimizer.GrowthFactor = 1.1;
+
+movingRegistered = imregister(moving, fixed, <span class="string">'affine'</span>, optimizer, metric);
+figure, imshowpair(movingRegistered, fixed)
+title(<span class="string">'MaximumIterations = 100, GrowthFactor = 1.1'</span>)
+</pre><img vspace="5" hspace="5" src="ipexknee_08.png" alt=""> <p>That seemed too aggressive.  Perhaps the default value is too large.  Try a smaller 'GrowthFactor' setting.</p><pre class="codeinput">optimizer.GrowthFactor = 1.01;
+
+tic
+movingRegisteredGrowth = imregister(moving, fixed, <span class="string">'affine'</span>, optimizer, metric);
+timeGrowth = toc
+
+figure, imshowpair(movingRegisteredGrowth, fixed)
+title(<span class="string">'C: MaximumIterations = 100, GrowthFactor = 1.01'</span>)
+</pre><pre class="codeoutput">
+timeGrowth =
+
+    2.7120
+
+</pre><img vspace="5" hspace="5" src="ipexknee_09.png" alt=""> <h2>Step 5: Further Refinement<a name="13"></a></h2><p>Usually a combination of changes to the step-size parameters and number of iterations to run yields the best results.</p><pre class="codeinput">[optimizer,metric] = imregconfig(<span class="string">'multimodal'</span>);
+optimizer.GrowthFactor = 1.01;
+optimizer.InitialRadius = 0.009;
+optimizer.Epsilon = 1.5e-4;
+optimizer.MaximumIterations = 300;
+
+tic
+movingRegisteredTuned = imregister(moving, fixed, <span class="string">'affine'</span>, optimizer, metric);
+timeTuned = toc
+
+figure, imshowpair(movingRegisteredTuned, fixed)
+title(<span class="string">'D: MaximumIterations = 300, GrowthFactor = 1.01, Epsilon = 1.5e-4, InitialRadius = 0.009'</span>)
+</pre><pre class="codeoutput">
+timeTuned =
+
+    8.2353
+
+</pre><img vspace="5" hspace="5" src="ipexknee_10.png" alt=""> <h2>Step 6: Deciding When Enough is Enough<a name="14"></a></h2><p>Comparing the results of running <tt>imregister</tt> with different configurations, it becomes apparent that there's a trade-off between performance and accuracy.  The difference in execution time and quality of the default registration run for 100 iterations (A) and the most highly tuned set of properties (B) is quite large.</p><p>The difference between running <tt>imregister</tt> with a nonstandard growth factor for 100 iterations (C) and the best result (B) is obvious, too. It becomes more of a trade-off between the quality of the highly tuned registration executed to 300 iterations (D) and the default registration run to 500 iterations (B), given the comparatively small amount of time that it took to get there.</p><pre class="codeinput">figure
+imshowpair(movingRegisteredDefault, fixed)
+title(sprintf(<span class="string">'A - Default settings - %0.2f sec'</span>, timeDefault))
+
+figure
+imshowpair(movingRegistered500, fixed)
+title(sprintf(<span class="string">'B - Default settings, 500 iterations - %0.2f sec'</span>, time500))
+
+figure
+imshowpair(movingRegisteredGrowth, fixed)
+title(sprintf(<span class="string">'C - Growth factor, 100 iterations - %0.2f sec'</span>, timeGrowth))
+
+figure
+imshowpair(movingRegisteredTuned, fixed)
+title(sprintf(<span class="string">'D - Highly tuned, 300 iterations - %0.2f sec'</span>, timeTuned))
+</pre><img vspace="5" hspace="5" src="ipexknee_11.png" alt=""> <img vspace="5" hspace="5" src="ipexknee_12.png" alt=""> <img vspace="5" hspace="5" src="ipexknee_13.png" alt=""> <img vspace="5" hspace="5" src="ipexknee_14.png" alt=""> <h2>Step 7: Alternate Visualizations<a name="15"></a></h2><p>Often as the quality of multimodal registrations improve it becomes more difficult to judge the quality of registration visually.  This is because the intensity differences can obscure areas of misalignment.  Sometimes switching to a different display mode for <tt>imshowpair</tt> exposes hidden details.  (This is not always the case.)</p><p class="footer">Copyright 2011 The MathWorks, Inc.<br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2013a</a><br><br>
+		  MATLAB and Simulink are registered trademarks of The MathWorks, Inc.  Please see <a href="http://www.mathworks.com/trademarks">www.mathworks.com/trademarks</a> for a list of other trademarks owned by The MathWorks, Inc.  Other product or brand names are trademarks or registered trademarks of their respective owners.
+      </p></div><!--
+##### SOURCE BEGIN #####
+%% Registering Multimodal MRI Images
+% This example shows how you can use |imregister| to automatically
+% align two magnetic resonance images (MRI) to a common coordinate
+% system using intensity-based image registration.  Unlike some other
+% techniques, it does not find features or use control points.
+% Intensity-based registration is often well-suited for medical and
+% remotely sensed imagery.
+
+% Copyright 2011 The MathWorks, Inc.
+
+
+%% Step 1: Load Images
+% This example uses two magnetic resonance (MRI) images of a knee.
+% The fixed image is a spin echo image, while the moving image is a
+% spin echo image with inversion recovery.  The two sagittal slices
+% were acquired at the same time but are slightly out of alignment.
+
+fixed = dicomread('knee1.dcm');
+moving = dicomread('knee2.dcm');
+
+%%
+% The |imshowpair| function is a useful function for visualizing
+% images during every part of the registration process.  Use it to see
+% the two images individually in a montage fashion or display them
+% stacked to show the amount of misregistration.
+
+figure, imshowpair(moving, fixed, 'montage')
+title('Unregistered')
+
+%%
+% In the overlapping image from |imshowpair|, gray areas correspond to
+% areas that have similar intensities, while magenta and green areas
+% show places where one image is brighter than the other.  In some
+% imager pairs, green and magenta areas don't always indicate
+% misregistration, but in this example it's easy to use the color
+% information to see where they do.
+
+figure, imshowpair(moving, fixed)
+title('Unregistered')
+
+
+%% Step 2: Set up the Initial Registration
+% The |imregconfig| function makes it easy to pick the correct
+% optimizer and metric configuration to use with |imregister|. These
+% two images have different intensity distributions, which suggests a
+% multimodal configuration.
+
+[optimizer,metric] = imregconfig('multimodal');
+
+%%
+% The distortion between the two images includes scaling, rotation,
+% and (possibly) shear.  Use an affine transformation to register the
+% images.
+%
+% It's very, very rare that |imregister| will align images perfectly
+% with the default settings.  Nevertheless, using them is a useful way
+% to decide which properties to tune first.
+
+tic
+movingRegisteredDefault = imregister(moving, fixed, 'affine', optimizer, metric);
+timeDefault = toc
+
+figure, imshowpair(movingRegisteredDefault, fixed)
+title('A: Default registration')
+
+
+%% Step 3: Improve the Registration
+% The initial registration was pretty good, but there are still some
+% areas that don't line up.  It's easiest to see this along the left
+% and right edges of the image and in the small bright bands that run
+% through the right-hand part.  Try to improve the registration by
+% adjusting the optimizer and metric configuration properties.
+%
+% The optimizer and metric variables are objects whose properties
+% control the registration.
+
+optimizer
+metric
+
+%%
+% Because the registration improved with the default parameters,
+% perhaps it will continue to improve if the optimization runs longer.
+
+optimizer.MaximumIterations = 300;
+
+movingRegistered = imregister(moving, fixed, 'affine', optimizer, metric);
+figure, imshowpair(movingRegistered, fixed)
+title('MaximumIterations = 300')
+
+%%
+% Does it continue to improve if run even longer?
+
+optimizer.MaximumIterations = 500;
+
+tic
+movingRegistered500 = imregister(moving, fixed, 'affine', optimizer, metric);
+time500 = toc
+
+figure, imshowpair(movingRegistered500, fixed)
+title('B: MaximumIterations = 500')
+
+
+%% Step 4: Improve the Speed of Registration
+% The previous section showed that it's often possible to improve a
+% registration with the default parameters simply by letting it run
+% longer.  Although increasing 'MaximumIterations' will likely lead to
+% convergence, it's also likely that running for a longer time will
+% yield diminishing returns.
+%
+% It's often possible to force the optimizer to be more aggressive in
+% its initial steps.  Changing parameters that control step size might
+% move the registration closer to the correct solution more quickly,
+% but it could result in treating a local extrema as the best answer,
+% when the best answer is elsewhere in the optimization space.
+%
+% The 'InitialRadius' property controls the initial search radius for
+% the optimizer.
+
+optimizer.MaximumIterations = 100;
+optimizer.InitialRadius = 0.009;
+
+movingRegistered = imregister(moving, fixed, 'affine', optimizer, metric);
+figure, imshowpair(movingRegistered, fixed)
+title('MaximumIterations = 100, InitialRadius = 0.009')
+
+%%
+% Compared with the default configuration, the results are worse.
+% While 'InitialRadius specifies the upper bound of the search radius,
+% 'Epsilon' sets the lower bound.
+
+[optimizer,metric] = imregconfig('multimodal');
+optimizer.Epsilon = 1.5e-4;
+
+movingRegistered = imregister(moving, fixed, 'affine', optimizer, metric);
+figure, imshowpair(movingRegistered, fixed)
+title('MaximumIterations = 100, Epsilon = 1.5e-4')
+
+%%
+% This configuration yields almost exactly the same registration as
+% the default parameters with almost no difference in performance.
+%
+% The only remaining optimizer property to tweak independently is
+% 'GrowthFactor', which controls the rate at which the search radius
+% grows in parameter space.  A larger growth factor causes a more
+% aggressive optimization.
+
+[optimizer,metric] = imregconfig('multimodal');
+optimizer.GrowthFactor = 1.1;
+
+movingRegistered = imregister(moving, fixed, 'affine', optimizer, metric);
+figure, imshowpair(movingRegistered, fixed)
+title('MaximumIterations = 100, GrowthFactor = 1.1')
+
+%%
+% That seemed too aggressive.  Perhaps the default value is too
+% large.  Try a smaller 'GrowthFactor' setting.
+
+optimizer.GrowthFactor = 1.01;
+
+tic
+movingRegisteredGrowth = imregister(moving, fixed, 'affine', optimizer, metric);
+timeGrowth = toc
+
+figure, imshowpair(movingRegisteredGrowth, fixed)
+title('C: MaximumIterations = 100, GrowthFactor = 1.01')
+
+
+%% Step 5: Further Refinement
+% Usually a combination of changes to the step-size parameters and
+% number of iterations to run yields the best results.
+
+[optimizer,metric] = imregconfig('multimodal');
+optimizer.GrowthFactor = 1.01;
+optimizer.InitialRadius = 0.009;
+optimizer.Epsilon = 1.5e-4;
+optimizer.MaximumIterations = 300;
+
+tic
+movingRegisteredTuned = imregister(moving, fixed, 'affine', optimizer, metric);
+timeTuned = toc
+
+figure, imshowpair(movingRegisteredTuned, fixed)
+title('D: MaximumIterations = 300, GrowthFactor = 1.01, Epsilon = 1.5e-4, InitialRadius = 0.009')
+
+
+%% Step 6: Deciding When Enough is Enough
+% Comparing the results of running |imregister| with different
+% configurations, it becomes apparent that there's a trade-off between
+% performance and accuracy.  The difference in execution time and
+% quality of the default registration run for 100 iterations (A) and
+% the most highly tuned set of properties (B) is quite large.
+%
+% The difference between running |imregister| with a nonstandard
+% growth factor for 100 iterations (C) and the best result (B) is
+% obvious, too. It becomes more of a trade-off between the quality of
+% the highly tuned registration executed to 300 iterations (D) and the
+% default registration run to 500 iterations (B), given the
+% comparatively small amount of time that it took to get there.
+
+figure
+imshowpair(movingRegisteredDefault, fixed)
+title(sprintf('A - Default settings - %0.2f sec', timeDefault))
+
+figure
+imshowpair(movingRegistered500, fixed)
+title(sprintf('B - Default settings, 500 iterations - %0.2f sec', time500))
+
+figure
+imshowpair(movingRegisteredGrowth, fixed)
+title(sprintf('C - Growth factor, 100 iterations - %0.2f sec', timeGrowth))
+
+figure
+imshowpair(movingRegisteredTuned, fixed)
+title(sprintf('D - Highly tuned, 300 iterations - %0.2f sec', timeTuned))
+
+
+%% Step 7: Alternate Visualizations
+% Often as the quality of multimodal registrations improve it becomes more
+% difficult to judge the quality of registration visually.  This is because
+% the intensity differences can obscure areas of misalignment.  Sometimes
+% switching to a different display mode for |imshowpair| exposes hidden
+% details.  (This is not always the case.)
+
+
+displayEndOfDemoMessage(mfilename)
+
+##### SOURCE END #####
+--></body></html>

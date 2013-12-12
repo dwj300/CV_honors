@@ -1,0 +1,84 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Measuring the Radius of a Roll of Tape</title><meta name="generator" content="MATLAB 8.1"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2013-01-17"><meta name="DC.source" content="ipexradius.m"><link rel="stylesheet" type="text/css" href="../../../matlab/helptools/private/style.css"></head><body><div class="header"><div class="left"><a href="matlab:edit ipexradius">Open ipexradius.m in the Editor</a></div><div class="right"><a href="matlab:echodemo ipexradius">Run in the Command Window</a></div></div><div class="content"><h1>Measuring the Radius of a Roll of Tape</h1><!--introduction--><p>This example shows how to measure the radius of a roll of tape, which is partially obscured by the tape dispenser. Utilize <tt>imfindcircles</tt> to accomplish this task.</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Step 1: Read Image</a></li><li><a href="#2">Step 2: Find the Circle</a></li><li><a href="#3">Step 3: Highlight the Circle Outline and Center</a></li></ul></div><h2>Step 1: Read Image<a name="1"></a></h2><p>Read in <tt>tape.png</tt>.</p><pre class="codeinput">RGB = imread(<span class="string">'tape.png'</span>);
+imshow(RGB);
+
+hTxt = text(15,15,<span class="string">'Estimate radius of the roll of tape'</span>,<span class="keyword">...</span>
+     <span class="string">'FontWeight'</span>,<span class="string">'bold'</span>,<span class="string">'Color'</span>,<span class="string">'y'</span>);
+</pre><img vspace="5" hspace="5" src="ipexradius_01.png" alt=""> <h2>Step 2: Find the Circle<a name="2"></a></h2><p>Find the center and the radius of the circle in the image using <tt>imfindcircles</tt>.</p><pre class="codeinput">Rmin = 60;
+Rmax = 100;
+[center, radius] = imfindcircles(RGB,[Rmin Rmax],<span class="string">'Sensitivity'</span>,0.9)
+</pre><pre class="codeoutput">
+center =
+
+  236.9291  172.4747
+
+
+radius =
+
+   79.5305
+
+</pre><h2>Step 3: Highlight the Circle Outline and Center<a name="3"></a></h2><pre class="codeinput"><span class="comment">% Display the circle</span>
+viscircles(center,radius);
+
+<span class="comment">% Display the calculated center</span>
+hold <span class="string">on</span>;
+plot(center(:,1),center(:,2),<span class="string">'yx'</span>,<span class="string">'LineWidth'</span>,2);
+hold <span class="string">off</span>;
+
+delete(hTxt);
+message = sprintf(<span class="string">'The estimated radius is %2.1f pixels'</span>, radius);
+text(15,15,message,<span class="string">'Color'</span>,<span class="string">'y'</span>,<span class="string">'FontWeight'</span>,<span class="string">'bold'</span>);
+</pre><img vspace="5" hspace="5" src="ipexradius_02.png" alt=""> <p class="footer">Copyright 2003-2011 The MathWorks, Inc.<br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2013a</a><br><br>
+		  MATLAB and Simulink are registered trademarks of The MathWorks, Inc.  Please see <a href="http://www.mathworks.com/trademarks">www.mathworks.com/trademarks</a> for a list of other trademarks owned by The MathWorks, Inc.  Other product or brand names are trademarks or registered trademarks of their respective owners.
+      </p></div><!--
+##### SOURCE BEGIN #####
+%% Measuring the Radius of a Roll of Tape
+% This example shows how to measure the radius of a roll of tape, which is
+% partially obscured by the tape dispenser. Utilize |imfindcircles| to
+% accomplish this task.
+%
+% Copyright 2003-2011 The MathWorks, Inc. 
+% $Revision: 1.1.6.5 $ $Date: 2011/11/09 16:49:38 $
+
+%% Step 1: Read Image
+% Read in |tape.png|.
+
+RGB = imread('tape.png');
+imshow(RGB);
+
+hTxt = text(15,15,'Estimate radius of the roll of tape',...
+     'FontWeight','bold','Color','y');
+
+%% Step 2: Find the Circle
+% Find the center and the radius of the circle in the image using
+% |imfindcircles|.
+
+Rmin = 60; 
+Rmax = 100;
+[center, radius] = imfindcircles(RGB,[Rmin Rmax],'Sensitivity',0.9)
+
+%% Step 3: Highlight the Circle Outline and Center
+
+% Display the circle
+viscircles(center,radius);
+
+% Display the calculated center
+hold on;
+plot(center(:,1),center(:,2),'yx','LineWidth',2);
+hold off;
+
+delete(hTxt);
+message = sprintf('The estimated radius is %2.1f pixels', radius);
+text(15,15,message,'Color','y','FontWeight','bold');
+
+displayEndOfDemoMessage(mfilename)
+
+##### SOURCE END #####
+--></body></html>

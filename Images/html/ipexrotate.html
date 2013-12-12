@@ -1,0 +1,150 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Find Image Rotation and Scale</title><meta name="generator" content="MATLAB 8.1"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2013-01-17"><meta name="DC.source" content="ipexrotate.m"><link rel="stylesheet" type="text/css" href="../../../matlab/helptools/private/style.css"></head><body><div class="header"><div class="left"><a href="matlab:edit ipexrotate">Open ipexrotate.m in the Editor</a></div><div class="right"><a href="matlab:echodemo ipexrotate">Run in the Command Window</a></div></div><div class="content"><h1>Find Image Rotation and Scale</h1><!--introduction--><p>This example shows how to align or register two images that differ by a rotation and a scale change. You can use <tt>cp2tform</tt> to find the rotation angle and scale factor after manually picking corresponding points. You can then transform the distorted image to recover the original image.</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Step 1: Read Image</a></li><li><a href="#2">Step 2: Resize and Rotate the Image</a></li><li><a href="#3">Step 3: Select Control Points</a></li><li><a href="#6">Step 4: Estimate Transformation</a></li><li><a href="#8">Step 5: Solve for Scale and Angle</a></li><li><a href="#10">Step 6: Recover Original Image</a></li></ul></div><h2>Step 1: Read Image<a name="1"></a></h2><p>Read an image into the workspace.</p><pre class="codeinput">original = imread(<span class="string">'cameraman.tif'</span>);
+imshow(original);
+text(size(original,2),size(original,1)+15, <span class="keyword">...</span>
+    <span class="string">'Image courtesy of Massachusetts Institute of Technology'</span>, <span class="keyword">...</span>
+    <span class="string">'FontSize'</span>,7,<span class="string">'HorizontalAlignment'</span>,<span class="string">'right'</span>);
+</pre><img vspace="5" hspace="5" src="ipexrotate_01.png" alt=""> <h2>Step 2: Resize and Rotate the Image<a name="2"></a></h2><pre class="codeinput">scale = 0.7;
+distorted = imresize(original,scale); <span class="comment">% Try varying the scale factor.</span>
+
+theta = 30;
+distorted = imrotate(distorted,theta); <span class="comment">% Try varying the angle, theta.</span>
+figure, imshow(distorted)
+</pre><img vspace="5" hspace="5" src="ipexrotate_02.png" alt=""> <h2>Step 3: Select Control Points<a name="3"></a></h2><p>Use the Control Point Selection Tool to pick at least two pairs of control points.</p><pre class="codeinput">input_points = [151.52  164.79; 131.40 79.04];
+base_points = [135.26  200.15; 170.30 79.30];
+</pre><p>You can run the rest of the example with these pre-picked points, but try picking your own points to see how the results vary.</p><pre>cpselect(distorted,original,input_points,base_points);</pre><p>Save control points by choosing the <b>File</b> menu, then the <b>Save Points to Workspace</b> option. Save the points, overwriting variables <tt>input_points</tt> and <tt>base_points</tt>.</p><h2>Step 4: Estimate Transformation<a name="6"></a></h2><p>Find a <tt>TFORM</tt> structure that is consistent with your control points.</p><pre class="codeinput">t = cp2tform(input_points,base_points,<span class="string">'nonreflective similarity'</span>);
+</pre><p>After you have done Steps 5 and 6, repeat Steps 4 through 6 but try using 'affine' instead of 'nonreflective similarity'. What happens? Are the results as good as they were with 'nonreflective similarity'?</p><h2>Step 5: Solve for Scale and Angle<a name="8"></a></h2><p>The <tt>TFORM</tt> structure, <tt>t</tt>, contains a transformation matrix in <tt>t.tdata.Tinv</tt>. Since you know that the transformation includes only rotation and scaling, the math is relatively simple to recover the scale and angle.</p><pre>Let sc = s*cos(theta)
+Let ss = s*sin(theta)</pre><pre>Then, Tinv = t.tdata.Tinv = [sc -ss  0;
+                             ss  sc  0;
+                             tx  ty  1]</pre><pre>where tx and ty are x and y translations, respectively.</pre><pre class="codeinput">ss = t.tdata.Tinv(2,1);
+sc = t.tdata.Tinv(1,1);
+scale_recovered = sqrt(ss*ss + sc*sc)
+theta_recovered = atan2(ss,sc)*180/pi
+</pre><pre class="codeoutput">
+scale_recovered =
+
+    0.7000
+
+
+theta_recovered =
+
+   29.3741
+
+</pre><p>The recovered values of <tt>scale_recovered</tt> and <tt>theta_recovered</tt> should match the values you set in <b>Step 2: Resize and Rotate the Image</b>.</p><h2>Step 6: Recover Original Image<a name="10"></a></h2><p>Recover the original image by transforming <tt>distorted</tt>, the rotated-and-scaled image, using <tt>TFORM</tt> structure <tt>t</tt> and what you know about the size of <tt>original</tt>.</p><pre class="codeinput">D = size(original);
+recovered = imtransform(distorted,t,<span class="string">'XData'</span>,[1 D(2)],<span class="string">'YData'</span>,[1 D(1)]);
+</pre><p>Compare <tt>recovered</tt> to <tt>original</tt> by looking at them side-by-side in a montage.</p><pre class="codeinput">figure, imshowpair(original,recovered,<span class="string">'montage'</span>)
+</pre><img vspace="5" hspace="5" src="ipexrotate_03.png" alt=""> <p>The <tt>recovered</tt> (right) image quality does not match the <tt>original</tt> (left) image because of the distortion and recovery process. In particular, the image shrinking causes loss of information. The artifacts around the edges are due to the limited accuracy of the transformation.  If you were to pick more points in <b>Step 3: Select Control Points</b>, the transformation would be more accurate.</p><p class="footer">Copyright 1993-2012 The MathWorks, Inc.<br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2013a</a><br><br>
+		  MATLAB and Simulink are registered trademarks of The MathWorks, Inc.  Please see <a href="http://www.mathworks.com/trademarks">www.mathworks.com/trademarks</a> for a list of other trademarks owned by The MathWorks, Inc.  Other product or brand names are trademarks or registered trademarks of their respective owners.
+      </p></div><!--
+##### SOURCE BEGIN #####
+%% Find Image Rotation and Scale
+% This example shows how to align or register two images that differ by a
+% rotation and a scale change. You can use |cp2tform| to find the rotation angle
+% and scale factor after manually picking corresponding points. You can then
+% transform the distorted image to recover the original image.
+
+% Copyright 1993-2012 The MathWorks, Inc. 
+% $Revision: 1.4.4.11 $ $Date: 2012/04/25 07:11:26 $
+
+%% Step 1: Read Image
+% Read an image into the workspace.
+
+original = imread('cameraman.tif');
+imshow(original);
+text(size(original,2),size(original,1)+15, ...
+    'Image courtesy of Massachusetts Institute of Technology', ...
+    'FontSize',7,'HorizontalAlignment','right');
+
+%% Step 2: Resize and Rotate the Image
+
+scale = 0.7;
+distorted = imresize(original,scale); % Try varying the scale factor.
+
+theta = 30;
+distorted = imrotate(distorted,theta); % Try varying the angle, theta.
+figure, imshow(distorted)
+
+%% Step 3: Select Control Points
+% Use the Control Point Selection Tool to pick at least two pairs of
+% control points. 
+
+input_points = [151.52  164.79; 131.40 79.04];
+base_points = [135.26  200.15; 170.30 79.30];
+
+%%
+% You can run the rest of the example with these pre-picked points, but 
+% try picking your own points to see how the results vary.
+%
+%  cpselect(distorted,original,input_points,base_points);
+
+%%
+% Save control points by choosing the *File* menu, then the *Save Points to
+% Workspace* option. Save the points, overwriting variables |input_points|
+% and |base_points|.
+
+%% Step 4: Estimate Transformation
+% Find a |TFORM| structure that is consistent with your control points.
+
+t = cp2tform(input_points,base_points,'nonreflective similarity');
+
+%%
+% After you have done Steps 5 and 6, repeat Steps 4 through 6 but try using
+% 'affine' instead of 'nonreflective similarity'. What happens? Are the results
+% as good as they were with 'nonreflective similarity'?
+
+%% Step 5: Solve for Scale and Angle
+% The |TFORM| structure, |t|, contains a transformation matrix in
+% |t.tdata.Tinv|. Since you know that the transformation includes only
+% rotation and scaling, the math is relatively simple to recover the scale
+% and angle.
+%
+%  Let sc = s*cos(theta)
+%  Let ss = s*sin(theta)
+%
+%  Then, Tinv = t.tdata.Tinv = [sc -ss  0;
+%                               ss  sc  0;
+%                               tx  ty  1]
+%
+%  where tx and ty are x and y translations, respectively.
+
+ss = t.tdata.Tinv(2,1);
+sc = t.tdata.Tinv(1,1);
+scale_recovered = sqrt(ss*ss + sc*sc)
+theta_recovered = atan2(ss,sc)*180/pi
+
+%%
+% The recovered values of |scale_recovered| and |theta_recovered| should match
+% the values you set in *Step 2: Resize and Rotate the Image*.
+
+%% Step 6: Recover Original Image
+% Recover the original image by transforming |distorted|, the rotated-and-scaled
+% image, using |TFORM| structure |t| and what you know about the size of
+% |original|.
+
+D = size(original);
+recovered = imtransform(distorted,t,'XData',[1 D(2)],'YData',[1 D(1)]);
+
+%%
+% Compare |recovered| to |original| by looking at them side-by-side in a montage.
+figure, imshowpair(original,recovered,'montage')
+
+%%
+% The |recovered| (right) image quality does not match the |original| (left)
+% image because of the distortion and recovery process. In particular, the image
+% shrinking causes loss of information. The artifacts around the edges are due
+% to the limited accuracy of the transformation.  If you were to pick more
+% points in *Step 3: Select Control Points*, the transformation would be more
+% accurate.
+
+displayEndOfDemoMessage(mfilename)
+
+
+##### SOURCE END #####
+--></body></html>
