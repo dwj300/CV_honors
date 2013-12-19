@@ -1,6 +1,6 @@
 % em.m % Matt Rozak
 % Image segmentation using Expectation-Maximization w/ a mix of Gaussians
-% Heavily based off of implementation by Rongwen Lu
+% Based off of an implementation by Rongwen Lu
 % http://www.mathworks.com/matlabcentral/fileexchange/34164-image-segmentation-with-em-algorithm
 
 % %% args %%
@@ -17,7 +17,7 @@
 
 function maskOut = em(image, K, maxIter, convTol, useG, gSize, gSigma)
 
-disp(['EM: K=', K, ' maxIter=', maxIter, ' convTol=', convTol])
+fprintf('EM: K=%d  maxIter=%d convTol=%f\n', K, maxIter, convTol);
 
 img=double(image);
 
@@ -30,7 +30,7 @@ if P > 1
 end
 
 if isColor
-    imgR=img(:,:,1); 
+    imgR=img(:,:,1); % split image into separate RGB channels
     imgG=img(:,:,2);
     imgB=img(:,:,3);
 
@@ -73,7 +73,7 @@ end
 [n,dim]=size(raw);
 u = raw(randi([1,n],K,1),:);
 
-% v is the vector ot the estimated SD 
+% v is the vector of the estimated SD 
 % initialize standard diviation v, v has K raws, one column.
 v=zeros(K,1);
 for ii=1:K
@@ -81,6 +81,7 @@ for ii=1:K
     v(ii,:)=std(raw_tmp);
 end
 
+% w is the weight of each cluster K
 w=ones(K,1)/K; % initialize weight w
 
 % initialize membership probability matrix (assignment matrix) p, which is p(K|x)
@@ -120,9 +121,11 @@ while energy > convTol && iteration < maxIter
     end
     
     % save current u, v, and w as u0, v0 and w0
-    u0=u;v0=v;w0=w;
+    u0=u;
+    v0=v;
+    w0=w;
     
-    %update u
+    % update u
     u=(pNorm.')*raw;
     
     % update v
@@ -138,13 +141,12 @@ while energy > convTol && iteration < maxIter
     % update w
     w=(sum(p)/n).';
     
-    % update and display iteration and energy
-    
-    %disp(sprintf(['iteration=',num2str(iteration),'; energy=',num2str(energy,'%g')]))
+    % update iteration and energy
     iteration=iteration+1;
     energy=sum(sum((u-u0).^2))+sum(sum((v-v0).^2))+(sum((w-w0).^2));
 end
 
+disp
 if iteration == maxIter
     disp('Did not converge before iteration limit...')
 end
