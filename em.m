@@ -11,42 +11,60 @@
 % K       - the number of clusters
 % maxIter - the maximum number of EM iterations 
 % convTol - the tolerance of convergence
+% useG    - decides whether to apply gaussian filter to image before EM segmentation
+% gSize   - the height and width of the gaussian filter mask
+% gSigma  - the sigma parameter of the gaussian filter
 
-function maskOut = em(image, K, maxIter, useG, gSize, gSigma) %, maxIter, convTol)
+function maskOut = em(image, K, maxIter, convTol, useG, gSize, gSigma)
+
+disp(['EM: K=', K, ' maxIter=', maxIter, ' convTol=', convTol])
 
 img=double(image);
 
 [M,N,P]=size(img);
 n=M*N;
-imgR=img(:,:,1); 
-imgG=img(:,:,2);
-imgB=img(:,:,3);
-[cy,cx]=ind2sub([M,N],1:n);
 
-% normalize each vector; delete it if normalization is not needed; weights
-%  are also assigned here;
-imgR=mat2gray(imgR);
-imgG=mat2gray(imgG);
-imgB=mat2gray(imgB);
-cy=mat2gray(cy);
-cx=mat2gray(cx);
-
-% Gaussian filter - helps reduce noise when relying on color space alone
-if useG ~= 0
-    w=fspecial('gaussian',[gSize,gSize],gSigma);
-    imgR=imfilter(imgR,w);
-    imgG=imfilter(imgG,w);
-    imgB=imfilter(imgB,w);
+isColor = 0; % check if image is color or grayscale
+if P > 1
+    isColor = 1;
 end
 
-% assign vectors into the matrix raw
-% Raw's size is [n,dim], where n is the NO of data and dim is the dimention of data.
-raw=zeros(n,3);
-raw(:,1)=imgR(:);
-raw(:,2)=imgG(:);
-raw(:,3)=imgB(:);
-% raw(:,4)=cy.';  % potentially use spatial
-% raw(:,5)=cx.';
+if isColor
+    imgR=img(:,:,1); 
+    imgG=img(:,:,2);
+    imgB=img(:,:,3);
+
+    % normalize vectors
+    imgR=mat2gray(imgR);
+    imgG=mat2gray(imgG);
+    imgB=mat2gray(imgB);
+
+    % Gaussian filter - helps reduce noise when relying on color space alone
+    if useG ~= 0
+        w=fspecial('gaussian',[gSize,gSize],gSigma);
+        imgR=imfilter(imgR,w);
+        imgG=imfilter(imgG,w);
+        imgB=imfilter(imgB,w);
+    end
+
+    % assign vectors into the matrix raw
+    % Raw's size is [n,dim], where n is the NO of data and dim is the dimension of data.
+    raw=zeros(n,3);
+    raw(:,1)=imgR(:);
+    raw(:,2)=imgG(:);
+    raw(:,3)=imgB(:);
+
+else
+    % Gaussian filter - helps reduce noise when relying on color space alone
+    if useG ~= 0
+        w=fspecial('gaussian',[gSize,gSize],gSigma);
+        img=imfilter(img,w);
+    end
+
+    % assign vectors into the matrix raw
+    % Raw's size is [n,dim], where n is the NO of data and dim is the dimension of data.
+    raw=img(:);
+end
 
 % Use Expectation Maximization method to estimate K Gaussian distribution functions. 
 
@@ -76,7 +94,7 @@ w0=w*0;
 energy=sum(sum((u-u0).^2))+sum(sum((v-v0).^2))+(sum((w-w0).^2));
 iteration=1;
 x_u=zeros(size(raw));
-while energy>10^(-6) && iteration < maxIter
+while energy > convTol && iteration < maxIter
 
     % calculate membership probability, which is also assignment matrix
     for jj=1:K
@@ -88,13 +106,13 @@ while energy>10^(-6) && iteration < maxIter
         p(:,jj)=p(:,jj)*w(jj);
        
     end
-    % normalize p on the x dimention
+    % normalize p on the x dimension
     pSum=sum(p,2);
     for jj=1:K
         p(:,jj)=p(:,jj)./pSum;
     end
     
-    % normlaize p on the y dimention, yielding pNorm
+    % normalize p on the y dimension, yielding pNorm
     pSum2=sum(p,1);
     pNorm=p*0;
     for jj=1:K
@@ -127,14 +145,17 @@ while energy>10^(-6) && iteration < maxIter
     energy=sum(sum((u-u0).^2))+sum(sum((v-v0).^2))+(sum((w-w0).^2));
 end
 
-imgRe=zeros(n,3);
-kColor=jet(K);
-kColor=u(:,1:3);
-imgRe=p*kColor;
-
-maskOut=zeros(M,N,3);
-for ii=1:3
-    maskOut(:,:,ii)=reshape(imgRe(:,ii),[M,N]);
+if iteration == maxIter
+    disp('Did not converge before iteration limit...')
 end
 
-segImg = [];
+if isColor
+    imgRe=p*u;
+    maskOut=zeros(M,N,3);
+    for ii=1:3
+        maskOut(:,:,ii)=reshape(imgRe(:,ii),[M,N]);
+    end
+else
+    imgRe=p*u;
+    maskOut=reshape(imgRe,[M,N]);
+end
